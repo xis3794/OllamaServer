@@ -46,10 +46,16 @@ jobs:
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK
+      - name: Build Release APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon -PbundleInDebug=true
+          # Release build bundles JS automatically; sign with the project's debug keystore
+          # (MYAPP_RELEASE_* properties are read conditionally in app/build.gradle)
+          ./gradlew assembleRelease --no-daemon \
+            -PMYAPP_RELEASE_STORE_FILE=debug.keystore \
+            -PMYAPP_RELEASE_STORE_PASSWORD=android \
+            -PMYAPP_RELEASE_KEY_ALIAS=androiddebugkey \
+            -PMYAPP_RELEASE_KEY_PASSWORD=android
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
