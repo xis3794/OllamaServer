@@ -1,4 +1,7 @@
 {
+  "copy": "复制",
+  "share": "分享",
+  "copiedToClipboard": "已复制到剪贴板",
   "ok": "确定",
   "cancel": "取消",
   "waiting": "请稍后",

@@ -1,4 +1,7 @@
 {
+  "copy": "Copy",
+  "share": "Share",
+  "copiedToClipboard": "Copied to clipboard",
   "ok": "Ok",
   "cancel": "Cancel",
   "waiting": "Waiting",

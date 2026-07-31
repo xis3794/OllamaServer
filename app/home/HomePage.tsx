@@ -9,6 +9,9 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet, ToastAndroid, ListRenderItem, ActivityIndicator,
+    Share,
+    Alert,
+    NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {NavigationProp, ParamListBase, useNavigation} from '@react-navigation/native';
@@ -199,49 +202,92 @@ const HomePage = ({ route }) => {
             })
     };
 
+    // 复制消息文本到剪贴板
+    const handleCopyText = (text: string) => {
+        try {
+            NativeModules.ClipboardModule.copyToClipboard(text);
+            ToastAndroid.show(t('copiedToClipboard'), ToastAndroid.SHORT);
+        } catch (e) {
+            log.error('Clipboard copy error:', e);
+            ToastAndroid.show(t('copiedToClipboard'), ToastAndroid.SHORT);
+        }
+    };
+
+    // 分享消息文本
+    const handleShareText = (text: string) => {
+        Share.share({ message: text }).catch((e) => {
+            log.error('Share error:', e);
+        });
+    };
+
+    // 长按消息弹出菜单
+    const handleMessageLongPress = (item: Message) => {
+        Alert.alert(
+            '',
+            '',
+            [
+                {
+                    text: t('copy'),
+                    onPress: () => handleCopyText(item.content),
+                },
+                {
+                    text: t('share'),
+                    onPress: () => handleShareText(item.content),
+                },
+                { text: t('cancel'), style: 'cancel' },
+            ],
+            { cancelable: true },
+        );
+    };
+
     const renderMessage: ListRenderItem<Message> = ({ item }) => {
-        return <View style={[
-            styles.messageRow,
-            item.role === 'assistant' ? styles.botMessageRow : styles.userMessageRow
-        ]}>
-            {item.role === 'assistant' && (
-                <View style={styles.avatarContainer}>
-                    <View style={[
-                        styles.avatar,
-                        item.role === 'assistant' ? styles.botAvatar : styles.userAvatar
-                    ]}>
-                        <Text style={styles.avatarText}>
-                            {item.role === 'assistant' ? 'AI' : 'U'}
-                        </Text>
-                    </View>
-                </View>
-            )}
-            <View
+        return (
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onLongPress={() => handleMessageLongPress(item)}
                 style={[
-                    styles.messageContainer,
-                    item.role === 'assistant' ? styles.botMessage : styles.userMessage,
+                    styles.messageRow,
+                    item.role === 'assistant' ? styles.botMessageRow : styles.userMessageRow
                 ]}>
-                <Markdown
-                    style={item.role === 'assistant' ? assistantMarkdownStyles : userMarkdownStyles}
-                    markdownit={rules}
-                    rules={renderRules}
-                >
-                    {item.content}
-                </Markdown>
-            </View>
-            {item.role !== 'assistant' && (
-                <View style={styles.avatarContainer}>
-                    <View style={[
-                        styles.avatar,
-                        item.role === 'assistant' ? styles.botAvatar : styles.userAvatar
-                    ]}>
-                        <Text style={styles.avatarText}>
-                            {item.role === 'assistant' ? 'AI' : 'U'}
-                        </Text>
+                {item.role === 'assistant' && (
+                    <View style={styles.avatarContainer}>
+                        <View style={[
+                            styles.avatar,
+                            item.role === 'assistant' ? styles.botAvatar : styles.userAvatar
+                        ]}>
+                            <Text style={styles.avatarText}>
+                                {item.role === 'assistant' ? 'AI' : 'U'}
+                            </Text>
+                        </View>
                     </View>
+                )}
+                <View
+                    style={[
+                        styles.messageContainer,
+                        item.role === 'assistant' ? styles.botMessage : styles.userMessage,
+                    ]}>
+                    <Markdown
+                        style={item.role === 'assistant' ? assistantMarkdownStyles : userMarkdownStyles}
+                        markdownit={rules}
+                        rules={renderRules}
+                    >
+                        {item.content}
+                    </Markdown>
                 </View>
-            )}
-        </View>
+                {item.role !== 'assistant' && (
+                    <View style={styles.avatarContainer}>
+                        <View style={[
+                            styles.avatar,
+                            item.role === 'assistant' ? styles.botAvatar : styles.userAvatar
+                        ]}>
+                            <Text style={styles.avatarText}>
+                                {item.role === 'assistant' ? 'AI' : 'U'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
     };
 
     const assistantMarkdownStyles = {
