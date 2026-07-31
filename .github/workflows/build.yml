@@ -49,7 +49,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon -PbundleInDebug=true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
