@@ -41,7 +41,7 @@ jobs:
             "cmake;3.22.1"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --registry=https://registry.npmmirror.com
 
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
