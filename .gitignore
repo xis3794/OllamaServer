@@ -78,4 +78,3 @@ yarn-error.log
 dist/
 web-build/
 /android/app/release/
-package-lock.json
