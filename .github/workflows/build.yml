@@ -46,6 +46,13 @@ jobs:
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Build Debug APK
+        run: |
+          cd android
+          # debug APK now embeds assets/index.android.bundle from src/main/assets,
+          # so it runs standalone (falls back to assets bundle when Metro is absent)
+          ./gradlew assembleDebug --no-daemon
+
       - name: Build Release APK
         run: |
           cd android
@@ -57,9 +64,16 @@ jobs:
             -PMYAPP_RELEASE_KEY_ALIAS=androiddebugkey \
             -PMYAPP_RELEASE_KEY_PASSWORD=android
 
-      - name: Upload APK artifact
+      - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
