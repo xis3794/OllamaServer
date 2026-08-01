@@ -9,11 +9,11 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet, ToastAndroid, ListRenderItem, ActivityIndicator,
-    Share,
-    Alert,
-    NativeModules,
+    GestureResponderEvent,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MessageActionMenu from "../components/MessageActionMenu.tsx";
+import SelectTextModal from "../components/SelectTextModal.tsx";
 import {NavigationProp, ParamListBase, useNavigation} from '@react-navigation/native';
 import ModelSelector from "../components/ModelSelector.tsx";
 import {chat, loadModel} from "../api/OllamaApi.ts";
@@ -39,6 +39,11 @@ const HomePage = ({ route }) => {
     const insets = useSafeAreaInsets();
     // 加载模型
     const [loadingModalVisible, setLoadingModalVisible] = useState(false)
+    // 长按消息操作菜单（记录长按位置与消息内容）
+    const [menuState, setMenuState] = useState<{visible: boolean; x: number; y: number; content: string}>({visible: false, x: 0, y: 0, content: ''});
+    // 选择文本复制弹窗
+    const [selectModalVisible, setSelectModalVisible] = useState(false);
+    const [selectText, setSelectText] = useState('');
     // 输入消息
     const [message, setMessage] = useState('');
     // 保持用 ref 存储实时数据，state 仅用于触发渲染
@@ -202,49 +207,17 @@ const HomePage = ({ route }) => {
             })
     };
 
-    // 复制消息文本到剪贴板
-    const handleCopyText = (text: string) => {
-        try {
-            NativeModules.ClipboardModule.copyToClipboard(text);
-            ToastAndroid.show(t('copiedToClipboard'), ToastAndroid.SHORT);
-        } catch (e) {
-            log.error('Clipboard copy error:', e);
-            ToastAndroid.show(t('copiedToClipboard'), ToastAndroid.SHORT);
-        }
-    };
-
-    // 分享消息文本
-    const handleShareText = (text: string) => {
-        Share.share({ message: text }).catch((e) => {
-            log.error('Share error:', e);
-        });
-    };
-
-    // 长按消息弹出菜单
-    const handleMessageLongPress = (item: Message) => {
-        Alert.alert(
-            '',
-            '',
-            [
-                {
-                    text: t('copy'),
-                    onPress: () => handleCopyText(item.content),
-                },
-                {
-                    text: t('share'),
-                    onPress: () => handleShareText(item.content),
-                },
-                { text: t('cancel'), style: 'cancel' },
-            ],
-            { cancelable: true },
-        );
+    // 长按消息：在长按位置弹出自定义操作菜单（复制/分享）
+    const handleMessageLongPress = (item: Message, event: GestureResponderEvent) => {
+        const {pageX, pageY} = event.nativeEvent;
+        setMenuState({visible: true, x: pageX, y: pageY, content: item.content});
     };
 
     const renderMessage: ListRenderItem<Message> = ({ item }) => {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onLongPress={() => handleMessageLongPress(item)}
+                onLongPress={(e) => handleMessageLongPress(item, e)}
                 style={[
                     styles.messageRow,
                     item.role === 'assistant' ? styles.botMessageRow : styles.userMessageRow
@@ -571,6 +544,25 @@ const HomePage = ({ route }) => {
                         </Dialog.Content>
                     </Dialog>
                 </Portal>
+
+                {/* 长按消息操作菜单（复制/分享，跟随长按位置） */}
+                <MessageActionMenu
+                    visible={menuState.visible}
+                    x={menuState.x}
+                    y={menuState.y}
+                    content={menuState.content}
+                    onClose={() => setMenuState((s) => ({...s, visible: false}))}
+                    onSelectText={(text) => {
+                        setSelectText(text);
+                        setSelectModalVisible(true);
+                    }}
+                />
+                {/* 选择文本复制弹窗 */}
+                <SelectTextModal
+                    visible={selectModalVisible}
+                    text={selectText}
+                    onClose={() => setSelectModalVisible(false)}
+                />
             </SafeAreaView>
         </View>
     );
