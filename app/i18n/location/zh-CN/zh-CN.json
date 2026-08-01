@@ -24,6 +24,13 @@
   "deleteConversationMsg": "确定要删除对话吗？",
 
   "settings": "设置",
+  "chatSettings": "对话设置",
+  "temperature": "温度",
+  "topP": "Top P",
+  "contextLength": "上下文长度",
+  "contextLengthHint": "0 表示使用模型默认值",
+  "contextDefault": "默认",
+  "restoreDefault": "恢复默认",
   "serverSettings": "服务器设置",
   "enableLanListening": "启用外部访问",
   "enableLanListeningDesc": "重启服务后生效。该配置可能会让Ollama服务暴露在公网中",

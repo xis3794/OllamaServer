@@ -14,6 +14,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MessageActionMenu from "../components/MessageActionMenu.tsx";
 import SelectTextModal from "../components/SelectTextModal.tsx";
+import ChatSettingsModal from "../components/ChatSettingsModal.tsx";
 import {NavigationProp, ParamListBase, useNavigation} from '@react-navigation/native';
 import ModelSelector from "../components/ModelSelector.tsx";
 import {chat, loadModel} from "../api/OllamaApi.ts";
@@ -21,7 +22,7 @@ import Markdown, {MarkdownIt} from "react-native-markdown-display";
 import {DrawerNavigationProp} from "@react-navigation/drawer";
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import {loadConversation, saveConversation} from "../utils/Storage.ts";
+import {loadConversation, saveConversation, loadChatSettings, saveChatSettings, ChatSettings, DEFAULT_CHAT_SETTINGS} from "../utils/Storage.ts";
 import {getSummary} from "../utils/ChatUtils.ts";
 import {useAppTheme} from "../theme/ThemeContext.tsx";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
@@ -44,6 +45,9 @@ const HomePage = ({ route }) => {
     // 选择文本复制弹窗
     const [selectModalVisible, setSelectModalVisible] = useState(false);
     const [selectText, setSelectText] = useState('');
+    // 对话设置弹窗
+    const [settingsVisible, setSettingsVisible] = useState(false);
+    const [chatSettings, setChatSettings] = useState<ChatSettings>({...DEFAULT_CHAT_SETTINGS});
     // 输入消息
     const [message, setMessage] = useState('');
     // 保持用 ref 存储实时数据，state 仅用于触发渲染
@@ -155,7 +159,22 @@ const HomePage = ({ route }) => {
             setMessage('')
             flatListRef.current?.scrollToEnd({ animated: true })
 
-            chatSessionRef.current = chat(selectedModel, messagesRef.current, chatResponse => {
+            // 按上下文长度截断历史消息（粗略估算：1 token ≈ 2 字符）
+            let historyForRequest = messagesRef.current;
+            if (chatSettings.numCtx > 0) {
+                const budget = chatSettings.numCtx * 2;
+                let total = 0;
+                const trimmed: Message[] = [];
+                for (let i = messagesRef.current.length - 1; i >= 0; i--) {
+                    const len = messagesRef.current[i].content.length;
+                    if (total + len > budget && trimmed.length > 0) break;
+                    total += len;
+                    trimmed.unshift(messagesRef.current[i]);
+                }
+                historyForRequest = trimmed;
+            }
+
+            chatSessionRef.current = chat(selectedModel, historyForRequest, chatResponse => {
                 if (chatResponse.error) {
                     return
                 }
@@ -172,6 +191,10 @@ const HomePage = ({ route }) => {
                         forceUpdate({})
                     }
                 }
+            }, {
+                temperature: chatSettings.temperature,
+                top_p: chatSettings.topP,
+                num_ctx: chatSettings.numCtx,
             })
             chatSessionRef.current.promise.catch(e => {
                 ToastAndroid.show(`Chat error`, ToastAndroid.SHORT)
@@ -205,6 +228,19 @@ const HomePage = ({ route }) => {
                 ToastAndroid.show(`Loading Model error ${e}`, ToastAndroid.SHORT)
                 log.error(`Loading Model error: ${e}`)
             })
+    };
+
+    // 加载对话设置
+    useEffect(() => {
+        loadChatSettings()
+            .then((s) => setChatSettings(s))
+            .catch((e) => log.error(`Load chat settings error: ${e}`));
+    }, []);
+
+    // 对话设置变更：更新状态并持久化
+    const handleSettingsChange = (s: ChatSettings) => {
+        setChatSettings(s);
+        saveChatSettings(s).catch((e) => log.error(`Save chat settings error: ${e}`));
     };
 
     // 长按消息：在长按位置弹出自定义操作菜单（复制/分享）
@@ -362,6 +398,10 @@ const HomePage = ({ route }) => {
             position: 'absolute',
             right: 16,
         },
+        settingsButton: {
+            position: 'absolute',
+            right: 56,
+        },
         menuButton: {
             position: 'absolute',
             left: 16,
@@ -484,9 +524,14 @@ const HomePage = ({ route }) => {
                         onModelSelect={handleModelSelect}
                     />
                     <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => setSettingsVisible(true)}>
+                        <Icon name="settings" size={24} color={theme.colors.onSurface}/>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                         style={styles.newButton}
                         onPress={handleNewPress}>
-                        <Icon name="add-comment" size={24} color={theme.colors.onSurface} />
+                        <Icon name="add-comment" size={24} color={theme.colors.onSurface}/>
                     </TouchableOpacity>
                 </View>
 
@@ -562,6 +607,13 @@ const HomePage = ({ route }) => {
                     visible={selectModalVisible}
                     text={selectText}
                     onClose={() => setSelectModalVisible(false)}
+                />
+                {/* 对话设置弹窗 */}
+                <ChatSettingsModal
+                    visible={settingsVisible}
+                    settings={chatSettings}
+                    onChange={handleSettingsChange}
+                    onClose={() => setSettingsVisible(false)}
                 />
             </SafeAreaView>
         </View>

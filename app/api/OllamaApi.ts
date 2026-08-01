@@ -144,10 +144,17 @@ export const loadModel = async (modelName: string): Promise<LoadResponse> => {
 };
 
 // ============================= chat（对话消息流）=============================
+export interface ChatOptions {
+    temperature?: number;
+    top_p?: number;
+    num_ctx?: number;
+}
+
 export const chat = (
     modelName: string,
     messages: Message[],
     chatResponseCallback: (chatResponse: ChatResponse) => void,
+    options?: ChatOptions,
 ): ChatSessionType => {
     const xhr = new XMLHttpRequest();
 
@@ -181,7 +188,17 @@ export const chat = (
             reject(new Error('Network Error'));
         };
 
-        xhr.send(JSON.stringify({ model: modelName, messages: messages }));
+        // 组装请求体，仅传入显式设置过的采样参数
+        const body: any = { model: modelName, messages: messages };
+        if (options) {
+            const o: any = {};
+            if (options.temperature !== undefined) o.temperature = options.temperature;
+            if (options.top_p !== undefined) o.top_p = options.top_p;
+            if (options.num_ctx !== undefined && options.num_ctx > 0) o.num_ctx = options.num_ctx;
+            if (Object.keys(o).length > 0) body.options = o;
+        }
+
+        xhr.send(JSON.stringify(body));
     });
 
     return {

@@ -86,6 +86,7 @@ const SelectTextModal = ({visible, text, onClose}: Props) => {
                             },
                         ]}
                         multiline
+                        editable={false}
                         value={value}
                         onChangeText={setValue}
                         selection={selection}
