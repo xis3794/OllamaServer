@@ -10,6 +10,7 @@ interface ToolCall {
 interface Message {
     role: string,
     content: string,
+    images?: string[], // base64 编码的图片（视觉模型）
 }
 
 interface LoadResponse {

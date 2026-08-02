@@ -10,6 +10,7 @@ import {
     Platform,
     StyleSheet, ToastAndroid, ListRenderItem, ActivityIndicator,
     GestureResponderEvent,
+    Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MessageActionMenu from "../components/MessageActionMenu.tsx";
@@ -17,7 +18,8 @@ import SelectTextModal from "../components/SelectTextModal.tsx";
 import ChatSettingsModal from "../components/ChatSettingsModal.tsx";
 import {NavigationProp, ParamListBase, useNavigation} from '@react-navigation/native';
 import ModelSelector from "../components/ModelSelector.tsx";
-import {chat, loadModel} from "../api/OllamaApi.ts";
+import {chat, loadModel, showModel} from "../api/OllamaApi.ts";
+import * as DocumentPicker from 'expo-document-picker';
 import Markdown, {MarkdownIt} from "react-native-markdown-display";
 import {DrawerNavigationProp} from "@react-navigation/drawer";
 import 'react-native-get-random-values';
@@ -48,6 +50,10 @@ const HomePage = ({ route }) => {
     // 对话设置弹窗
     const [settingsVisible, setSettingsVisible] = useState(false);
     const [chatSettings, setChatSettings] = useState<ChatSettings>({...DEFAULT_CHAT_SETTINGS});
+    // 当前模型是否为视觉模型（决定是否显示图片插入入口）
+    const [isVisionModel, setIsVisionModel] = useState(false);
+    // 待发送的图片（base64）
+    const [pendingImage, setPendingImage] = useState<string | null>(null);
     // 输入消息
     const [message, setMessage] = useState('');
     // 保持用 ref 存储实时数据，state 仅用于触发渲染
@@ -147,7 +153,8 @@ const HomePage = ({ route }) => {
             let addedAssistantMessage = false
             const userMsg: Message = {
                 role: 'user',
-                content: message
+                content: message,
+                images: pendingImage ? [pendingImage] : undefined,
             }
             messagesRef.current = [...messagesRef.current, userMsg]
             forceUpdate({})
@@ -157,6 +164,7 @@ const HomePage = ({ route }) => {
                     log.error(`Save conversation error: ${err}`)
                 })
             setMessage('')
+            setPendingImage(null)
             flatListRef.current?.scrollToEnd({ animated: true })
 
             // 按上下文长度截断历史消息（粗略估算：1 token ≈ 2 字符）
@@ -213,6 +221,8 @@ const HomePage = ({ route }) => {
 
     const handleModelSelect = (model: OllamaModel) => {
         setSelectedModel(model.name);
+        // 切换模型时先重置视觉状态
+        setIsVisionModel(false);
         setLoadingModalVisible(true);
         loadModel(model.name)
             .then((response: LoadResponse) => {
@@ -227,7 +237,50 @@ const HomePage = ({ route }) => {
                 setLoadingModalVisible(false);
                 ToastAndroid.show(`Loading Model error ${e}`, ToastAndroid.SHORT)
                 log.error(`Loading Model error: ${e}`)
+            });
+        // 查询模型 capabilities，判断是否为视觉模型（失败则视为非视觉）
+        showModel(model.name)
+            .then((info: ShowResponse) => {
+                const caps = info.capabilities || [];
+                setIsVisionModel(caps.includes('vision'));
             })
+            .catch((e) => {
+                log.error(`Show model error: ${e}`);
+                setIsVisionModel(false);
+            });
+    };
+
+    // 点击加号：选择图片（保留扩展点，以后可在此加入其他模态入口）
+    const handleAttachPress = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'image/*',
+                copyToCacheDirectory: true,
+            });
+            if (result.canceled || result.assets.length === 0) {
+                return;
+            }
+            const uri = result.assets[0].uri;
+            // 压缩并转 base64（最长边 1024、JPEG 质量 70，兼顾清晰度与体积）
+            NativeModules.FileUploadModule.readImageAsBase64(
+                uri,
+                1024,
+                70,
+                (base64: string) => {
+                    setPendingImage(base64);
+                },
+                (err: any) => {
+                    log.error(`Read image error: ${err}`);
+                    ToastAndroid.show(t('imageLoadFailed'), ToastAndroid.SHORT);
+                },
+            );
+        } catch (e) {
+            log.error(`Pick image error: ${e}`);
+        }
+    };
+
+    const handleRemoveImage = () => {
+        setPendingImage(null);
     };
 
     // 加载对话设置
@@ -275,6 +328,18 @@ const HomePage = ({ route }) => {
                         styles.messageContainer,
                         item.role === 'assistant' ? styles.botMessage : styles.userMessage,
                     ]}>
+                    {item.images && item.images.length > 0 && (
+                        <View style={styles.messageImages}>
+                            {item.images.map((b64, idx) => (
+                                <Image
+                                    key={idx}
+                                    source={{uri: `data:image/jpeg;base64,${b64}`}}
+                                    style={styles.messageImage}
+                                    resizeMode="cover"
+                                />
+                            ))}
+                        </View>
+                    )}
                     <Markdown
                         style={item.role === 'assistant' ? assistantMarkdownStyles : userMarkdownStyles}
                         markdownit={rules}
@@ -468,6 +533,49 @@ const HomePage = ({ route }) => {
             backgroundColor: theme.colors.background,
             borderTopWidth: 1,
             borderTopColor: theme.colors.surfaceContainerLow,
+            alignItems: 'center',
+        },
+        attachButton: {
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 4,
+        },
+        imagePreviewRow: {
+            flexDirection: 'row',
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            backgroundColor: theme.colors.background,
+        },
+        imagePreviewWrap: {
+            position: 'relative',
+        },
+        imagePreview: {
+            width: 72,
+            height: 72,
+            borderRadius: 12,
+        },
+        imagePreviewRemove: {
+            position: 'absolute',
+            top: -6,
+            right: -6,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: theme.colors.error,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        messageImages: {
+            marginBottom: 6,
+        },
+        messageImage: {
+            width: 160,
+            height: 160,
+            borderRadius: 10,
+            marginBottom: 4,
         },
         input: {
             flex: 1,
@@ -550,7 +658,30 @@ const HomePage = ({ route }) => {
                 {/* Fixed Input Bar */}
                 <KeyboardAvoidingView
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+                    {pendingImage && (
+                        <View style={styles.imagePreviewRow}>
+                            <View style={styles.imagePreviewWrap}>
+                                <Image
+                                    source={{uri: `data:image/jpeg;base64,${pendingImage}`}}
+                                    style={styles.imagePreview}
+                                    resizeMode="cover"
+                                />
+                                <TouchableOpacity
+                                    style={styles.imagePreviewRemove}
+                                    onPress={handleRemoveImage}>
+                                    <Icon name="close" size={14} color="#fff"/>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
                     <View style={styles.inputContainer}>
+                        {isVisionModel && (
+                            <TouchableOpacity
+                                style={styles.attachButton}
+                                onPress={handleAttachPress}>
+                                <Icon name="add" size={26} color={theme.colors.onSurfaceVariant}/>
+                            </TouchableOpacity>
+                        )}
                         <TextInput
                             style={styles.input}
                             value={message}

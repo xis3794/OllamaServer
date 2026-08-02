@@ -143,6 +143,28 @@ export const loadModel = async (modelName: string): Promise<LoadResponse> => {
     return await response.json();
 };
 
+// ============================= show（查看模型信息/capabilities）=============================
+export interface ShowResponse {
+    model?: string;
+    capabilities?: string[];
+    details?: any;
+}
+
+// 查看模型信息，capabilities 包含 "vision" 表示视觉模型
+export const showModel = async (modelName: string): Promise<ShowResponse> => {
+    const response = await fetch(`${OLLAMA_SERVER}/api/show`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: modelName }),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+    }
+    return await response.json();
+};
+
 // ============================= chat（对话消息流）=============================
 export interface ChatOptions {
     temperature?: number;
