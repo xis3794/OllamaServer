@@ -111,6 +111,10 @@ class OllamaExecutor(private val context: Context) {
             }
             copyAssetDirRecursive("$abi/lib", File(getBinaryDir(), "lib"))
 
+            // assets 复制不保留可执行位，需手动设置（否则 llama-server spawn 报 permission denied）
+            File(getBinaryDir(), "lib/ollama/llama-server").setExecutable(true)
+            File(getBinaryDir(), "lib/ollama/llama-quantize").setExecutable(true)
+
             // 设置可执行权限（重试机制）
             if (!targetFile.setExecutable(true)) {
                 throw IOException("Failed to set executable permission")
