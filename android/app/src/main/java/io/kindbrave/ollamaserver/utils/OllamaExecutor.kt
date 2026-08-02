@@ -49,6 +49,7 @@ class OllamaExecutor(private val context: Context) {
             // 检查版本是否匹配且文件存在
             savedVersion == currentVersion
                     && File(getBinaryDir(), BINARY_NAME).exists()
+                    && File(getBinaryDir(), "lib").exists()
         } catch (e: Exception) {
             false
         }
@@ -193,6 +194,9 @@ class OllamaExecutor(private val context: Context) {
             val env = processBuilder.environment()
             env["LD_LIBRARY_PATH"] = "$libDir:$libOllamaDir:$nativeLibDir:${env["LD_LIBRARY_PATH"] ?: ""}"
             env["OLLAMA_LIBRARY_PATH"] = libOllamaDir // 新版 ollama 依赖库与 llama-server 所在目录
+            // Android app 没有 /tmp，必须显式指定临时目录（新版 llama.cpp 引擎重度依赖）
+            val tmpDir = File(context.filesDir, "tmp").apply { mkdirs() }
+            env["OLLAMA_TMPDIR"] = tmpDir.absolutePath
             env["HOME"] = homeDir
             env["OLLAMA_DEBUG"] = "1"
             if (lanListening) env["OLLAMA_HOST"] = "0.0.0.0"
