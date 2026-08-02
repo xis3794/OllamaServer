@@ -86,9 +86,13 @@ const SelectTextModal = ({visible, text, onClose}: Props) => {
                             },
                         ]}
                         multiline
-                        editable={false}
                         value={value}
-                        onChangeText={setValue}
+                        // 只读：忽略一切输入/删除修改（editable=false 在 Android 上会同时禁用文本选择，
+                        // 因此保持可编辑状态，但用受控 value 保证内容不可变）
+                        onChangeText={() => {
+                            // ignore edits
+                        }}
+                        showSoftInputOnFocus={false}
                         selection={selection}
                         onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
                         autoFocus
