@@ -202,6 +202,11 @@ class OllamaExecutor(private val context: Context) {
             val tmpDir = File(context.filesDir, "tmp").apply { mkdirs() }
             env["OLLAMA_TMPDIR"] = tmpDir.absolutePath
             env["HOME"] = homeDir
+            // Ollama Cloud API Key（设置了则本地 ollama 可运行 cloud 模型，如 gpt-oss:120b-cloud）
+            val cloudApiKey = prefs.getString(OllamaConfigModule.CLOUD_API_KEY, "")?.trim()
+            if (!cloudApiKey.isNullOrEmpty()) {
+                env["OLLAMA_API_KEY"] = cloudApiKey
+            }
             env["OLLAMA_DEBUG"] = "1"
             if (lanListening) env["OLLAMA_HOST"] = "0.0.0.0"
             else env["OLLAMA_HOST"] = "127.0.0.1"

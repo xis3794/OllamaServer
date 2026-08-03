@@ -32,9 +32,63 @@ import kotlin.math.roundToInt
 class FileUploadModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(
         reactContext
-    ) {
+    ), com.facebook.react.modules.core.ActivityEventListener {
+
+    private var pendingPickerPromise: Promise? = null
+    private val PICK_IMAGE_REQUEST = 8801
+
+    init {
+        reactContext.addActivityEventListener(this)
+    }
+
     override fun getName(): String {
         return "FileUploadModule"
+    }
+
+    /**
+     * 打开系统相册选择图片（无需存储权限，返回 content:// uri）
+     * Android 13+ 使用系统 Photo Picker，旧版本回退到图库
+     */
+    @ReactMethod
+    fun pickImage(promise: Promise) {
+        val activity = currentActivity
+        if (activity == null) {
+            promise.reject("NO_ACTIVITY", "currentActivity is null")
+            return
+        }
+        pendingPickerPromise = promise
+        try {
+            val intent: Intent
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent = Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                    type = "image/*"
+                }
+            } else {
+                intent = Intent(Intent.ACTION_PICK).apply {
+                    type = "image/*"
+                }
+            }
+            activity.startActivityForResult(intent, PICK_IMAGE_REQUEST)
+        } catch (e: Exception) {
+            pendingPickerPromise = null
+            promise.reject("PICK_ERROR", e)
+        }
+    }
+
+    override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == PICK_IMAGE_REQUEST) {
+            val promise = pendingPickerPromise ?: return
+            pendingPickerPromise = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                promise.resolve(data.data.toString())
+            } else {
+                promise.reject("PICK_CANCELLED", "Image picking cancelled")
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        // no-op
     }
 
     /**
@@ -51,9 +105,18 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
             val uri = uriString.toUri()
             val resolver = reactContext.contentResolver
 
+            // 打开输入流：content:// 用 ContentResolver，file:// 用 FileInputStream
+            fun openStream(): java.io.InputStream {
+                return if (uri.scheme == "file") {
+                    java.io.FileInputStream(java.io.File(uri.path!!))
+                } else {
+                    resolver.openInputStream(uri)!!
+                }
+            }
+
             // 先读取图片尺寸（不加载像素）
             val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, boundsOpts) }
+            openStream().use { BitmapFactory.decodeStream(it, null, boundsOpts) }
             if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) {
                 promise.reject("READ_IMAGE_ERROR", "Failed to decode image bounds")
                 return
@@ -69,11 +132,7 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
 
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
             var bitmap: Bitmap? = null
-            resolver.openInputStream(uri)?.use { bitmap = BitmapFactory.decodeStream(it, null, decodeOpts) }
-                ?: run {
-                    promise.reject("READ_IMAGE_ERROR", "Cannot open image stream")
-                    return
-                }
+            openStream().use { bitmap = BitmapFactory.decodeStream(it, null, decodeOpts) }
             if (bitmap == null) {
                 promise.reject("READ_IMAGE_ERROR", "Cannot decode image")
                 return

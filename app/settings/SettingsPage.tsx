@@ -55,6 +55,15 @@ const SettingsPage = () => {
     const pullSessionRef = useRef<PullSessionType | null>(null);
     // 是否启用局域网监听
     const [lanListeningEnabled, setLanListeningEnabled] = useState(false);
+    // Ollama Cloud API Key
+    const [cloudApiKey, setCloudApiKey] = useState('');
+    const [cloudKeyDialogVisible, setCloudKeyDialogVisible] = useState(false);
+
+    useEffect(() => {
+        OllamaConfigModule.getCloudApiKey((key: string) => {
+            setCloudApiKey(key || '');
+        });
+    }, []);
 
     const checkServerStatus = async (): Promise<boolean> => {
         try {
@@ -318,6 +327,12 @@ const SettingsPage = () => {
                         <View>
                             <List.Subheader>{t('appSettings')}</List.Subheader>
                             <List.Item
+                                title={t('cloudApiKey')}
+                                description={cloudApiKey ? t('cloudApiKeySet') : t('cloudApiKeyEmpty')}
+                                left={() => <List.Icon icon="cloud-key" />}
+                                onPress={() => { setCloudKeyDialogVisible(true) }}
+                            />
+                            <List.Item
                                 title={t('about')}
                                 left={() => <List.Icon icon="information" />}
                                 onPress={()=>{setAboutDialogVisible(true)}}
@@ -326,6 +341,30 @@ const SettingsPage = () => {
                     </List.Section>
                 </ScrollView>
 
+                <Portal>
+                    <Dialog visible={cloudKeyDialogVisible} onDismiss={() => {setCloudKeyDialogVisible(false)}}>
+                        <Dialog.Title>{t('cloudApiKey')}</Dialog.Title>
+                        <Dialog.Content>
+                            <Text style={styles.text}>{t('cloudApiKeyDesc')}</Text>
+                            <TextInput
+                                mode="outlined"
+                                label="API Key"
+                                value={cloudApiKey}
+                                onChangeText={setCloudApiKey}
+                                secureTextEntry
+                                style={{ marginTop: 12 }}
+                            />
+                        </Dialog.Content>
+                        <Dialog.Actions>
+                            <Button onPress={() => setCloudKeyDialogVisible(false)}>{t('cancel')}</Button>
+                            <Button onPress={() => {
+                                OllamaConfigModule.setCloudApiKey(cloudApiKey);
+                                setCloudKeyDialogVisible(false);
+                                ToastAndroid.show(t('cloudApiKeySaved'), ToastAndroid.SHORT);
+                            }}>{t('ok')}</Button>
+                        </Dialog.Actions>
+                    </Dialog>
+                </Portal>
                 <Portal>
                     <Dialog visible={closeServerVisible}>
                         <Dialog.Title>{t('closeServer')}</Dialog.Title>

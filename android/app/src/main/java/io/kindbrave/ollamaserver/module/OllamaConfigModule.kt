@@ -18,6 +18,7 @@ class OllamaConfigModule(private val reactContext: ReactApplicationContext) :
         companion object {
             private const val PREFS_NAME: String = "ollama_prefs"
             const val LAN_LISTENING = "LAN_LISTENING"
+            const val CLOUD_API_KEY = "CLOUD_API_KEY"
         }
 
 
@@ -33,6 +34,20 @@ class OllamaConfigModule(private val reactContext: ReactApplicationContext) :
         val prefs: SharedPreferences = getReactApplicationContext()
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         promise.resolve(prefs.getBoolean(LAN_LISTENING, false))
+    }
+
+    @ReactMethod
+    fun setCloudApiKey(key: String) {
+        val prefs: SharedPreferences = getReactApplicationContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit { putString(CLOUD_API_KEY, key.trim()) }
+    }
+
+    @ReactMethod
+    fun getCloudApiKey(promise: Promise) {
+        val prefs: SharedPreferences = getReactApplicationContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        promise.resolve(prefs.getString(CLOUD_API_KEY, "") ?: "")
     }
 
     override fun getName(): String {

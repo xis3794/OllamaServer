@@ -19,7 +19,6 @@ import ChatSettingsModal from "../components/ChatSettingsModal.tsx";
 import {NavigationProp, ParamListBase, useNavigation} from '@react-navigation/native';
 import ModelSelector from "../components/ModelSelector.tsx";
 import {chat, loadModel, showModel} from "../api/OllamaApi.ts";
-import * as DocumentPicker from 'expo-document-picker';
 import Markdown, {MarkdownIt} from "react-native-markdown-display";
 import {DrawerNavigationProp} from "@react-navigation/drawer";
 import 'react-native-get-random-values';
@@ -250,33 +249,31 @@ const HomePage = ({ route }) => {
             });
     };
 
-    // 点击加号：选择图片（保留扩展点，以后可在此加入其他模态入口）
-    const handleAttachPress = async () => {
-        try {
-            const result = await DocumentPicker.getDocumentAsync({
-                type: 'image/*',
-                copyToCacheDirectory: true,
-            });
-            if (result.canceled || result.assets.length === 0) {
-                return;
-            }
-            const uri = result.assets[0].uri;
-            // 压缩并转 base64（最长边 1024、JPEG 质量 70，兼顾清晰度与体积）
-            NativeModules.FileUploadModule.readImageAsBase64(
-                uri,
-                1024,
-                70,
-                (base64: string) => {
-                    setPendingImage(base64);
-                },
-                (err: any) => {
-                    log.error(`Read image error: ${err}`);
-                    ToastAndroid.show(t('imageLoadFailed'), ToastAndroid.SHORT);
-                },
-            );
-        } catch (e) {
-            log.error(`Pick image error: ${e}`);
-        }
+    // 点击加号：打开系统相册选择图片（保留扩展点，以后可在此加入其他模态入口）
+    const handleAttachPress = () => {
+        NativeModules.FileUploadModule.pickImage(
+            (uri: string) => {
+                // 压缩并转 base64（最长边 1024、JPEG 质量 70，兼顾清晰度与体积）
+                NativeModules.FileUploadModule.readImageAsBase64(
+                    uri,
+                    1024,
+                    70,
+                    (base64: string) => {
+                        setPendingImage(base64);
+                    },
+                    (err: any) => {
+                        log.error(`Read image error: ${err}`);
+                        ToastAndroid.show(t('imageLoadFailed'), ToastAndroid.SHORT);
+                    },
+                );
+            },
+            (err: any) => {
+                // 用户取消或选择失败
+                if (err && err.code !== 'PICK_CANCELLED') {
+                    log.error(`Pick image error: ${err}`);
+                }
+            },
+        );
     };
 
     const handleRemoveImage = () => {
@@ -655,25 +652,26 @@ const HomePage = ({ route }) => {
                     />
                 </View>
 
+                {/* 图片预览（在键盘避让区域外，避免影响输入栏布局） */}
+                {pendingImage && (
+                    <View style={styles.imagePreviewRow}>
+                        <View style={styles.imagePreviewWrap}>
+                            <Image
+                                source={{uri: `data:image/jpeg;base64,${pendingImage}`}}
+                                style={styles.imagePreview}
+                                resizeMode="cover"
+                            />
+                            <TouchableOpacity
+                                style={styles.imagePreviewRemove}
+                                onPress={handleRemoveImage}>
+                                <Icon name="close" size={14} color="#fff"/>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
                 {/* Fixed Input Bar */}
                 <KeyboardAvoidingView
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-                    {pendingImage && (
-                        <View style={styles.imagePreviewRow}>
-                            <View style={styles.imagePreviewWrap}>
-                                <Image
-                                    source={{uri: `data:image/jpeg;base64,${pendingImage}`}}
-                                    style={styles.imagePreview}
-                                    resizeMode="cover"
-                                />
-                                <TouchableOpacity
-                                    style={styles.imagePreviewRemove}
-                                    onPress={handleRemoveImage}>
-                                    <Icon name="close" size={14} color="#fff"/>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
                     <View style={styles.inputContainer}>
                         {isVisionModel && (
                             <TouchableOpacity
