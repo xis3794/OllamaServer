@@ -1,8 +1,10 @@
 package io.kindbrave.ollamaserver.module
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.View
@@ -12,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.net.toUri
+import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -32,7 +35,7 @@ import kotlin.math.roundToInt
 class FileUploadModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(
         reactContext
-    ), com.facebook.react.modules.core.ActivityEventListener {
+    ), ActivityEventListener {
 
     private var pendingPickerPromise: Promise? = null
     private val PICK_IMAGE_REQUEST = 8801
