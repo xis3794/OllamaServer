@@ -59,6 +59,19 @@ const SettingsPage = () => {
     const [cloudApiKey, setCloudApiKey] = useState('');
     const [cloudKeyDialogVisible, setCloudKeyDialogVisible] = useState(false);
 
+    // 登录 Ollama Cloud：生成设备密钥并打开浏览器授权（ollama.com/connect）
+    const handleCloudSignin = async () => {
+        try {
+            const encKey: string = await NativeModules.CloudAuthModule.ensureCloudKeypair();
+            const url = `https://ollama.com/connect?name=android&key=${encodeURIComponent(encKey)}`;
+            Linking.openURL(url);
+            ToastAndroid.show(t('cloudSigninDone'), ToastAndroid.LONG);
+        } catch (e: any) {
+            log.error(`Cloud signin error: ${e?.message || e}`);
+            ToastAndroid.show(t('cloudSigninFailed'), ToastAndroid.SHORT);
+        }
+    };
+
     useEffect(() => {
         // getCloudApiKey 是 Promise 方法（原生 @ReactMethod 带 Promise 参数），必须用 then 方式调用
         OllamaConfigModule.getCloudApiKey()
@@ -331,6 +344,12 @@ const SettingsPage = () => {
                         )}
                         <View>
                             <List.Subheader>{t('appSettings')}</List.Subheader>
+                            <List.Item
+                                title={t('cloudSignin')}
+                                description={t('cloudSigninDesc')}
+                                left={() => <List.Icon icon="cloud-check" />}
+                                onPress={handleCloudSignin}
+                            />
                             <List.Item
                                 title={t('cloudApiKey')}
                                 description={cloudApiKey ? t('cloudApiKeySet') : t('cloudApiKeyEmpty')}

@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 
 import io.kindbrave.ollamaserver.module.ClipboardModule;
+import io.kindbrave.ollamaserver.module.CloudAuthModule;
 import io.kindbrave.ollamaserver.module.FileUploadModule;
 import io.kindbrave.ollamaserver.module.HashModule;
 import io.kindbrave.ollamaserver.module.LogSaveModule;
@@ -26,6 +27,7 @@ public class AppReactPackage implements ReactPackage {
         List<NativeModule> modules = new ArrayList<>();
         modules.add(new OllamaServiceModule(reactContext));
         modules.add(new OllamaConfigModule(reactContext));
+        modules.add(new CloudAuthModule(reactContext));
         modules.add(new FileUploadModule(reactContext));
         modules.add(new HashModule(reactContext));
         modules.add(new LogSaveModule(reactContext));

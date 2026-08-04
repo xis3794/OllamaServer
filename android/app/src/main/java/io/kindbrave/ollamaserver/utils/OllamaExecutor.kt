@@ -179,6 +179,15 @@ class OllamaExecutor(private val context: Context) {
 
     fun startOllamaService(): Process? {
         return try {
+            // Ollama Cloud 设备认证：serve 不会自动生成 ed25519 密钥对（ollama CLI 的
+            // initializeKeypair 才生成），而 cloud 请求转发必须用设备私钥签名，
+            // 没有密钥则签名失败 -> ollama.com 返回 401。这里确保密钥存在。
+            try {
+                io.kindbrave.ollamaserver.module.CloudAuthModule.ensureKeypair(context)
+            } catch (ke: Exception) {
+                LogUtils.getInstance(context).log("Cloud keypair init failed: $ke")
+            }
+
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val lanListening = prefs.getBoolean(OllamaConfigModule.LAN_LISTENING, false)
 
@@ -202,11 +211,9 @@ class OllamaExecutor(private val context: Context) {
             val tmpDir = File(context.filesDir, "tmp").apply { mkdirs() }
             env["OLLAMA_TMPDIR"] = tmpDir.absolutePath
             env["HOME"] = homeDir
-            // Ollama Cloud API Key（设置了则本地 ollama 可运行 cloud 模型，如 gpt-oss:120b-cloud）
-            val cloudApiKey = prefs.getString(OllamaConfigModule.CLOUD_API_KEY, "")?.trim()
-            if (!cloudApiKey.isNullOrEmpty()) {
-                env["OLLAMA_API_KEY"] = cloudApiKey
-            }
+            // 注意：cloud 模型（如 gpt-oss:120b-cloud）的认证走设备签名（.ollama/id_ed25519），
+            // 需要在设置页"登录 Ollama Cloud"打开浏览器授权（ollama.com/connect）。
+            // OLLAMA_API_KEY 对 ollama serve 无效（仅用于客户端直连 ollama.com API），故不再注入。
             env["OLLAMA_DEBUG"] = "1"
             if (lanListening) env["OLLAMA_HOST"] = "0.0.0.0"
             else env["OLLAMA_HOST"] = "127.0.0.1"
