@@ -334,7 +334,7 @@ const SettingsPage = () => {
                             <List.Item
                                 title={t('cloudApiKey')}
                                 description={cloudApiKey ? t('cloudApiKeySet') : t('cloudApiKeyEmpty')}
-                                left={() => <List.Icon icon="cloud-key" />}
+                                left={() => <List.Icon icon="key" />}
                                 onPress={() => { setCloudKeyDialogVisible(true) }}
                             />
                             <List.Item

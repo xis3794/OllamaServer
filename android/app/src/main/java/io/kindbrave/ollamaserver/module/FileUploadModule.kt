@@ -82,8 +82,15 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
         if (requestCode == PICK_IMAGE_REQUEST) {
             val promise = pendingPickerPromise ?: return
             pendingPickerPromise = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                promise.resolve(data.data.toString())
+            if (resultCode == Activity.RESULT_OK) {
+                // 部分图库返回 ClipData 而非 data.data，都兼容处理
+                val uri = data?.data
+                    ?: data?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+                if (uri != null) {
+                    promise.resolve(uri.toString())
+                } else {
+                    promise.reject("PICK_CANCELLED", "No image data returned")
+                }
             } else {
                 promise.reject("PICK_CANCELLED", "Image picking cancelled")
             }
@@ -104,6 +111,7 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
             promise.reject("INVALID_PARAMETERS", "uriString must be provided")
             return
         }
+        var bitmap: Bitmap? = null
         try {
             val uri = uriString.toUri()
             val resolver = reactContext.contentResolver
@@ -125,16 +133,16 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
                 return
             }
 
-            // 计算采样率，避免加载超大原图
+            // 计算采样率：直接采样到 maxDimension 内（而非 2 倍），
+            // 避免解码超大 bitmap 导致 OutOfMemoryError 闪退（安卓低内存设备常见）
             var sampleSize = 1
-            while (boundsOpts.outWidth / sampleSize > maxDimension * 2
-                || boundsOpts.outHeight / sampleSize > maxDimension * 2
+            while (boundsOpts.outWidth / sampleSize > maxDimension
+                || boundsOpts.outHeight / sampleSize > maxDimension
             ) {
                 sampleSize *= 2
             }
 
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            var bitmap: Bitmap? = null
             openStream().use { bitmap = BitmapFactory.decodeStream(it, null, decodeOpts) }
             if (bitmap == null) {
                 promise.reject("READ_IMAGE_ERROR", "Cannot decode image")
@@ -154,10 +162,14 @@ class FileUploadModule(private val reactContext: ReactApplicationContext) :
             val baos = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(10, 100), baos)
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-            bitmap.recycle()
             promise.resolve(base64)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // 用 Throwable 而非 Exception：OutOfMemoryError 等 Error 也必须被捕获，
+            // 否则会作为未捕获异常导致 app 闪退
+            bitmap?.recycle()
             promise.reject("READ_IMAGE_ERROR", e)
+        } finally {
+            bitmap?.recycle()
         }
     }
 
