@@ -11,6 +11,7 @@ import {
     StyleSheet, ToastAndroid, ListRenderItem, ActivityIndicator,
     GestureResponderEvent,
     Image,
+    NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MessageActionMenu from "../components/MessageActionMenu.tsx";
@@ -250,30 +251,22 @@ const HomePage = ({ route }) => {
     };
 
     // 点击加号：打开系统相册选择图片（保留扩展点，以后可在此加入其他模态入口）
-    const handleAttachPress = () => {
-        NativeModules.FileUploadModule.pickImage(
-            (uri: string) => {
-                // 压缩并转 base64（最长边 1024、JPEG 质量 70，兼顾清晰度与体积）
-                NativeModules.FileUploadModule.readImageAsBase64(
-                    uri,
-                    1024,
-                    70,
-                    (base64: string) => {
-                        setPendingImage(base64);
-                    },
-                    (err: any) => {
-                        log.error(`Read image error: ${err}`);
-                        ToastAndroid.show(t('imageLoadFailed'), ToastAndroid.SHORT);
-                    },
-                );
-            },
-            (err: any) => {
-                // 用户取消或选择失败
-                if (err && err.code !== 'PICK_CANCELLED') {
-                    log.error(`Pick image error: ${err}`);
-                }
-            },
-        );
+    const handleAttachPress = async () => {
+        try {
+            // pickImage / readImageAsBase64 都是原生 Promise 方法，必须用 await 方式调用
+            // （callback 方式会导致 bridge 参数不匹配直接抛异常崩溃）
+            const uri: string = await NativeModules.FileUploadModule.pickImage();
+            if (!uri) return;
+            // 压缩并转 base64（最长边 1024、JPEG 质量 70，兼顾清晰度与体积）
+            const base64: string = await NativeModules.FileUploadModule.readImageAsBase64(uri, 1024, 70);
+            setPendingImage(base64);
+        } catch (e: any) {
+            // 用户取消选择（PICK_CANCELLED）不提示，其余错误提示
+            if (e?.code !== 'PICK_CANCELLED') {
+                log.error(`Pick/read image error: ${e?.message || e}`);
+                ToastAndroid.show(t('imageLoadFailed'), ToastAndroid.SHORT);
+            }
+        }
     };
 
     const handleRemoveImage = () => {
