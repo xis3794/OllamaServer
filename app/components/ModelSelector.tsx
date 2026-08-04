@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     StyleSheet,
     TouchableOpacity,
@@ -26,8 +26,10 @@ const ModelSelector = ({ onModelSelect = (model: OllamaModel) => {}, currentMode
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    // Animation value for rotate transform
-    const rotateAnimation = new Animated.Value(0);
+    // Animation value for rotate transform（useRef 保证只创建一次，重渲染复用同一节点，
+    // 否则每次渲染 new Animated.Value 会生成新原生节点，导致
+    // "Animated node does not exist" 崩溃——点击设置触发 HomePage 重渲染时必现）
+    const rotateAnimation = useRef(new Animated.Value(0)).current;
     const { width: windowWidth } = useWindowDimensions();
 
     const toggleDropdown = () => {
