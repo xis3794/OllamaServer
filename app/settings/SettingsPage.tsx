@@ -60,9 +60,14 @@ const SettingsPage = () => {
     const [cloudKeyDialogVisible, setCloudKeyDialogVisible] = useState(false);
 
     useEffect(() => {
-        OllamaConfigModule.getCloudApiKey((key: string) => {
-            setCloudApiKey(key || '');
-        });
+        // getCloudApiKey 是 Promise 方法（原生 @ReactMethod 带 Promise 参数），必须用 then 方式调用
+        OllamaConfigModule.getCloudApiKey()
+            .then((key: string) => {
+                setCloudApiKey(key || '');
+            })
+            .catch((e) => {
+                log.error(`Get cloud api key error: ${e}`);
+            });
     }, []);
 
     const checkServerStatus = async (): Promise<boolean> => {
