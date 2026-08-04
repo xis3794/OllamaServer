@@ -78,8 +78,8 @@ class CloudAuthModule(private val reactContext: ReactApplicationContext) :
         private fun rawEd25519PublicKey(pub: EdECPublicKey): ByteArray {
             // y 坐标转 32 字节小端
             val yBytes = bigIntegerToLeBytes(pub.point.y, 32)
-            // x 为奇偶位：置入小端最后一个字节的最高位
-            if (pub.point.x) {
+            // x 为奇偶位（Optional<Boolean>，空视为偶数）：置入小端最后一个字节的最高位
+            if (pub.point.x.isPresent && pub.point.x.get()) {
                 yBytes[31] = (yBytes[31].toInt() or 0x80).toByte()
             }
             return yBytes
