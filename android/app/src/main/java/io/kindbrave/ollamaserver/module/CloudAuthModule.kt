@@ -8,9 +8,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.math.BigInteger
 import java.security.KeyPairGenerator
-import java.security.interfaces.EdECPublicKey
 
 /**
  * Ollama Cloud 设备认证：
@@ -59,7 +57,7 @@ class CloudAuthModule(private val reactContext: ReactApplicationContext) :
             val pem = "-----BEGIN PRIVATE KEY-----\n$pemBody\n-----END PRIVATE KEY-----\n"
 
             // 公钥：authorized_keys 格式 "ssh-ed25519 <base64>"
-            val rawPub = rawEd25519PublicKey(kp.public as EdECPublicKey)
+            val rawPub = rawEd25519PublicKey(kp.public)
             val sshBlob = ByteArrayOutputStream().apply {
                 writeLen("ssh-ed25519".toByteArray().size)
                 write("ssh-ed25519".toByteArray())
@@ -75,27 +73,24 @@ class CloudAuthModule(private val reactContext: ReactApplicationContext) :
             return rawUrlEncode(pubLine)
         }
 
-        private fun rawEd25519PublicKey(pub: EdECPublicKey): ByteArray {
-            // y 坐标转 32 字节小端
-            val yBytes = bigIntegerToLeBytes(pub.point.y, 32)
-            // x 为奇偶位（Optional<Boolean>，空视为偶数）：置入小端最后一个字节的最高位
-            if (pub.point.x.isPresent && pub.point.x.get()) {
-                yBytes[31] = (yBytes[31].toInt() or 0x80).toByte()
+        /**
+         * 从 X.509 SubjectPublicKeyInfo 中提取 Ed25519 raw 公钥（32 字节）。
+         * 注意：Android SDK 没有 java.security.interfaces.EdECPublicKey（JDK15+ 才有），
+         * 不能通过 point 属性取公钥；而 X.509 编码是标准结构，纯字节解析即可。
+         * SPKI: SEQUENCE { SEQUENCE { OID 1.3.101.112 (Ed25519) }, BIT STRING { unused=0, raw32 } }
+         */
+        private fun rawEd25519PublicKey(publicKey: java.security.PublicKey): ByteArray {
+            val x509 = publicKey.encoded
+            // 定位 BIT STRING: 0x03 0x21 0x00 <32 bytes raw>
+            for (i in 0..x509.size - 35) {
+                if (x509[i].toInt() == 0x03
+                    && (x509[i + 1].toInt() and 0xFF) == 0x21
+                    && x509[i + 2].toInt() == 0x00
+                ) {
+                    return x509.copyOfRange(i + 3, i + 35)
+                }
             }
-            return yBytes
-        }
-
-        private fun bigIntegerToLeBytes(v: BigInteger, len: Int): ByteArray {
-            val be = v.toByteArray() // big-endian（可能带符号位）
-            val out = ByteArray(len)
-            var src = be.size - 1
-            var dst = 0
-            while (src >= 0 && dst < len) {
-                out[dst] = be[src]
-                src--
-                dst++
-            }
-            return out
+            throw IllegalStateException("Cannot extract Ed25519 public key from X.509 encoding")
         }
 
         private fun ByteArrayOutputStream.writeLen(n: Int) {
