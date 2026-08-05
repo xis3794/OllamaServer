@@ -563,7 +563,7 @@ const SettingsPage = () => {
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                         }}
-                                        onPress={() => Linking.openURL('https://github.com/sunshine0523/OllamaServer')}
+                                        onPress={() => Linking.openURL('https://github.com/xis3794/OllamaServer')}
                                     >
                                         <Text style={{
                                             color: theme.customColors.link,
